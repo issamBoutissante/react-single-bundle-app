@@ -1,70 +1,128 @@
-# Getting Started with Create React App
+# Single Bundle Configuration for Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This guide details the process of configuring a Create React App (CRA) based project to generate a single JavaScript file and inline all CSS and JavaScript directly into the `index.html`. This is particularly useful when the application needs to be embedded in environments that do not support multiple file references, such as certain mobile application frameworks.
 
-## Available Scripts
+## Background
 
-In the project directory, you can run:
+By default, CRA splits the application code into various chunks to optimize load performance. However, this default behavior can be altered to bundle the entire application code into a single file. Additionally, Gulp is used to inline all the assets into `index.html`, creating a self-contained application.
 
-### `npm start`
+## Steps
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+The configuration involves two main steps:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1. **Disabling Code Splitting in CRA.**
+2. **Inlining all assets into `index.html` using Gulp.**
 
-### `npm test`
+### Disabling Code Splitting
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+To prevent CRA from splitting the code into chunks, we use `react-app-rewired` along with `customize-cra`. These allow us to modify the internal webpack configuration without ejecting.
 
-### `npm run build`
+1. Install `react-app-rewired` and `customize-cra`:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+   ```bash
+   npm install react-app-rewired customize-cra --save-dev
+   ```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+2. Create a `config-overrides.js` file in the root directory with the following content:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+   ```javascript
+   // config-overrides.js
+   const { override } = require("customize-cra");
 
-### `npm run eject`
+   module.exports = override((config) => {
+     config.optimization.splitChunks = {
+       cacheGroups: {
+         default: false,
+       },
+     };
+     config.optimization.runtimeChunk = false;
+     return config;
+   });
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Inlining Assets with Gulp
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Gulp automates the inlining of CSS and JS into `index.html`.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+1. Install Gulp and related plugins:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+   ```bash
+   npm install gulp gulp-inline-source gulp-replace gulp-cheerio --save-dev
+   ```
 
-## Learn More
+2. Set up the `gulpfile.js`:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+   ```javascript
+   // gulpfile.js
+   const gulp = require("gulp");
+   const inlineSource = require("gulp-inline-source");
+   const replace = require("gulp-replace");
+   const cheerio = require("gulp-cheerio");
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+   gulp.task("default", () => {
+     return gulp
+       .src("./build/*.html")
+       .pipe(
+         cheerio(($) => {
+           const scriptTag = $("script[defer]");
+           $("body").append(scriptTag);
+         })
+       )
+       .pipe(replace('.js"></script>', '.js" inline></script>'))
+       .pipe(replace('rel="stylesheet">', 'rel="stylesheet" inline>'))
+       .pipe(
+         inlineSource({
+           compress: false,
+           ignore: ["png"],
+         })
+       )
+       .pipe(gulp.dest("./build"));
+   });
+   ```
 
-### Code Splitting
+### Environment Variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Use a `.env` file to set environment variables for the build process:
 
-### Analyzing the Bundle Size
+```plaintext
+INLINE_RUNTIME_CHUNK=false
+GENERATE_SOURCEMAP=false
+SKIP_PREFLIGHT_CHECK=true
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Modifying package.json
 
-### Making a Progressive Web App
+Update the package.json to use react-app-rewired:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```json
+"scripts": {
+  "start": "react-app-rewired start",
+  "build": "react-app-rewired build",
+  "test": "react-app-rewired test",
+  "eject": "react-scripts eject"
+},
+```
 
-### Advanced Configuration
+_Note_: Ensure that you remove any code that forces chunks, such as the following, from your application:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```javascript
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
+```
 
-### Deployment
+### Running the Build
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+After setting up, run the build command to generate the single bundle and inline assets:
 
-### `npm run build` fails to minify
+```bash
+npm run build
+gulp
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The build script will create a production build with a single JavaScript file, and the gulp command will inline all resources into the `index.html`
+
+### Conclusion
+
+Following this configuration allows you to package a CRA application into a single `index.html` file with all assets inlined, suitable for use cases that require a standalone file for the entire application. It is recommended to thoroughly test the application after these modifications to ensure functionality remains intact.
