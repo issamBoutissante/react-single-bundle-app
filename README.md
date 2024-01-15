@@ -97,7 +97,7 @@ Update the package.json to use react-app-rewired:
 ```json
 "scripts": {
   "start": "react-app-rewired start",
-  "build": "react-app-rewired build",
+  "build": "react-app-rewired build && npx gulp",
   "test": "react-app-rewired test",
   "eject": "react-scripts eject"
 },
@@ -118,7 +118,6 @@ After setting up, run the build command to generate the single bundle and inline
 
 ```bash
 npm run build
-gulp
 ```
 
 The build script will create a production build with a single JavaScript file, and the gulp command will inline all resources into the `index.html`
